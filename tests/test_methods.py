@@ -2,7 +2,7 @@ import enum
 
 import pytest
 from typing import Any, AnyStr, Dict, Iterable, List, Tuple, TypeVar, Union
-from multimethod import DispatchError, get_type, multimeta, multimethod, signature, subtype
+from multimethod import DispatchError, Empty, get_type, multimeta, multimethod, signature, subtype
 
 
 # string join
@@ -59,11 +59,11 @@ def test_subtype():
 
     assert get_type(0) is int
     assert not isinstance(get_type(iter('')), subtype)
-    assert get_type(()) is tuple
+    assert get_type(()) == subtype(tuple, Empty)
     assert get_type((0, 0.0)) == subtype(tuple, int, float)
-    assert get_type([]) is list
+    assert get_type([]) == subtype(list, Empty)
     assert get_type([0, 0.0]) == subtype(list, int)
-    assert get_type({}) is dict
+    assert get_type({}) == subtype(dict, Empty)
     assert get_type({' ': 0}) == subtype(dict, str, int)
 
 
@@ -155,8 +155,8 @@ def test_register():
     assert func(0.0) is object
     assert func(0) is int
     assert func(False) is bool
-    assert func([0]) == func((0.0,)) == func({'': 0}) == 'union'
-    assert func([0.0]) == func((0.0, 1.0)) == func({}) == object
+    assert func([0]) == func((0.0,)) == func({'': 0}) == func({}) == 'union'
+    assert func([0.0]) == func((0.0, 1.0)) == object
 
 
 # multimeta
@@ -202,8 +202,7 @@ def test_ellipsis():
     assert func(tup) == tup
     tup = ((0, 1), (2, 3))
     assert func(tup) == tup
-    with pytest.raises(DispatchError):
-        func(())
+    assert func(()) == ()
     with pytest.raises(DispatchError):
         func(((0, 1.0),))
 
@@ -275,3 +274,16 @@ def test_dispatch_exception():
         return "optional"
 
     assert temp(True, 1.0) == "optional"
+
+
+def test_empty():
+    @multimethod
+    def func(arg: List[int]):
+        return int
+
+    @func.register
+    def _(arg: List[bool]):
+        return bool
+
+    assert func([0]) is int
+    assert func([False]) is func([]) is bool
